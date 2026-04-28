@@ -18,7 +18,12 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      # We use `npm install` (not `npm ci`) because some transitive deps in
+      # eslint-config-next > tinyglobby > fdir request a picomatch range that
+      # npm's strict lockfile validation rejects when hoisting collides. The
+      # lockfile is still committed and pinned; npm install just tolerates the
+      # transitive mismatch instead of failing CI for something we don't own.
+      - run: npm install --no-audit --no-fund
 
       # `next build` runs the full TypeScript + ESLint pass that `next dev`
       # skips. This catches the issues that only show up on Vercel.
