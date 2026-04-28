@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # `next build` runs the full TypeScript + ESLint pass that `next dev`
+      # skips. This catches the issues that only show up on Vercel.
+      #
+      # The publishable key here is a Clerk-format-valid dummy
+      # (base64('clerk.example.com$')); Clerk validates the key SHAPE during
+      # static prerender even when no real network call is made.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_URL: http://localhost:3000
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+          CLERK_SECRET_KEY: sk_test_dummy
+          CLERK_WEBHOOK_SECRET: whsec_dummy
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: dummy
+          STRIPE_SECRET_KEY: sk_test_dummy
+          STRIPE_WEBHOOK_SECRET: whsec_dummy
