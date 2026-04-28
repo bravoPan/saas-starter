@@ -1,0 +1,67 @@
+---
+title: Hello, MDX
+description: How to write blog posts in this starter — and what you get for free.
+date: 2026-04-28
+readTime: 3 min read
+# tier: optional. Omit (or set to 'free') for fully public posts.
+# Set to 'basic' | 'pro' | 'enterprise' to gate the body behind a Paywall.
+tier: free
+---
+
+This is an MDX post. Drop `.mdx` files into `src/content/blog/` and they show up
+on `/blog` automatically.
+
+## Markdown works
+
+You can use **all the standard markdown** — *emphasis*, [links](https://nextjs.org),
+~~strikethrough~~ (via `remark-gfm`), and lists:
+
+- Bullet one
+- Bullet two
+- Bullet three
+
+Numbered lists too:
+
+1. First
+2. Second
+3. Third
+
+## Code blocks have syntax highlighting
+
+```typescript
+// rehype-pretty-code + shiki render this on the server, no client JS.
+function meetsTier(user: Tier | null, required: Tier): boolean {
+  if (user === null) return false;
+  return TIER_LEVEL[user] >= TIER_LEVEL[required];
+}
+```
+
+```bash
+npm install
+npm run dev
+```
+
+## Tables
+
+| Pattern | When to use | Component |
+| --- | --- | --- |
+| Section gate | One paid section in a public page | `<Gate>` |
+| Soft paywall | Long-form with free preview | `<Paywall>` |
+| Silent gate | Buttons / menus | `<Gate fallback={null}>` |
+| Page guard | Whole page is paid | `requireTier()` |
+
+## Frontmatter you can use
+
+```yaml
+title: string           # required
+description: string     # required (used in <meta description>)
+date: 2026-04-28        # required (any Date-parseable string)
+readTime: 5 min read    # optional, free-form
+tier: free | basic | pro | enterprise   # optional, default = public
+```
+
+## Tier-gating
+
+Posts with `tier: pro` (or higher) auto-render with a soft paywall: the first
+paragraph is the public preview, the rest is wrapped in `<Paywall>`. See
+[`/blog/four-phases-of-shipping`](/blog/four-phases-of-shipping) for an example.

@@ -1,59 +1,91 @@
+import 'server-only';
+import fs from 'node:fs';
+import path from 'node:path';
+import matter from 'gray-matter';
+import { isTier, type Tier } from '@/app/lib/plans';
+
 /**
- * Minimal in-file blog data source.
+ * File-based MDX blog source.
  *
- * This is intentionally simple: a typed object map you can edit directly. Good enough
- * for a starter / changelog. When you need real content management:
+ * Drop `.mdx` files into `src/content/blog/`. Each file's slug = its filename
+ * without the `.mdx` extension. Frontmatter is parsed with gray-matter.
  *
- *   - File-based MDX: drop .mdx files in src/content/blog/ and read with @next/mdx
- *     or contentlayer.
- *   - DB-backed CMS: replace getAllPosts/getPost with Supabase queries; consider
- *     storing the body as MDX text and rendering server-side.
- *
- * Either path is straightforward because the rest of the app only depends on the
- * shape returned here.
+ * To migrate to a DB-backed CMS later: swap the implementations of
+ * `getAllPosts()` and `getPost()` for Supabase queries that return the same
+ * `BlogPost` shape. The pages don't import this module's internals.
  */
 
-export type BlogPost = {
-  slug: string;
+const CONTENT_DIR = path.join(process.cwd(), 'src/content/blog');
+
+export type BlogFrontmatter = {
   title: string;
   description: string;
   date: string;
-  readTime: string;
-  /** HTML string. Replace with MDX/Markdown when you scale up. */
-  contentHtml: string;
+  readTime?: string;
+  /** Optional access tier. Omit (or set to 'free') for fully public posts. */
+  tier?: Tier;
 };
 
-const POSTS: BlogPost[] = [
-  {
-    slug: 'hello-world',
-    title: 'Hello, world',
-    description: 'A starter post to show how the blog scaffolding works.',
-    date: 'Jan 1, 2026',
-    readTime: '2 min read',
-    contentHtml: `
-      <p class="mb-4">
-        This is the example post that ships with SaaS Starter. Edit
-        <code>src/app/blog/posts.ts</code> to add more, or wire it up to your CMS of choice.
-      </p>
-      <h2 class="text-2xl font-bold mt-8 mb-4">Why this scaffold is intentionally minimal</h2>
-      <p class="mb-4">
-        Most starters either ship zero blog support (forcing you to integrate an MDX library
-        on day one) or a full-blown CMS that's hard to rip out. We give you a working list
-        page and detail page backed by a typed object — change one file, you're up.
-      </p>
-      <h2 class="text-2xl font-bold mt-8 mb-4">Upgrading later</h2>
-      <p class="mb-4">
-        When you outgrow this, the easiest path is MDX files in <code>src/content/blog/</code>.
-        See the README for a sketch.
-      </p>
-    `,
-  },
-];
+export type BlogPost = BlogFrontmatter & {
+  slug: string;
+  /** Raw MDX source. Pages compile + render with <MDXRemote source={mdx} />. */
+  mdx: string;
+};
+
+function listMdxFiles(): string[] {
+  if (!fs.existsSync(CONTENT_DIR)) return [];
+  return fs.readdirSync(CONTENT_DIR).filter((name) => name.endsWith('.mdx'));
+}
+
+function parseFile(filename: string): BlogPost {
+  const filePath = path.join(CONTENT_DIR, filename);
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  const { data, content } = matter(raw);
+
+  if (typeof data.title !== 'string') {
+    throw new Error(`[blog] ${filename}: missing required string \`title\` in frontmatter`);
+  }
+  if (typeof data.description !== 'string') {
+    throw new Error(`[blog] ${filename}: missing required string \`description\` in frontmatter`);
+  }
+  if (data.date == null) {
+    throw new Error(`[blog] ${filename}: missing required \`date\` in frontmatter`);
+  }
+  if (data.tier !== undefined && !isTier(data.tier)) {
+    throw new Error(
+      `[blog] ${filename}: \`tier\` must be one of free|basic|pro|enterprise (got: ${JSON.stringify(data.tier)})`
+    );
+  }
+
+  // gray-matter may give us a Date object; serialize for client safety.
+  const date =
+    data.date instanceof Date ? data.date.toISOString().slice(0, 10) : String(data.date);
+
+  return {
+    slug: filename.replace(/\.mdx$/, ''),
+    title: data.title,
+    description: data.description,
+    date,
+    readTime: typeof data.readTime === 'string' ? data.readTime : undefined,
+    tier: data.tier as Tier | undefined,
+    mdx: content,
+  };
+}
 
 export function getAllPosts(): BlogPost[] {
-  return POSTS;
+  return listMdxFiles()
+    .map(parseFile)
+    .sort((a, b) => (a.date > b.date ? -1 : 1));
 }
 
 export function getPost(slug: string): BlogPost | null {
-  return POSTS.find((p) => p.slug === slug) ?? null;
+  const filename = `${slug}.mdx`;
+  const filePath = path.join(CONTENT_DIR, filename);
+  if (!fs.existsSync(filePath)) return null;
+  return parseFile(filename);
+}
+
+/** Returns true if a post should be soft-paywalled (gated, with a preview). */
+export function isPaywalled(post: BlogPost): boolean {
+  return post.tier !== undefined && post.tier !== 'free';
 }

@@ -12,10 +12,16 @@
   "dependencies": {
     "@clerk/nextjs": "^6.17.0",
     "@supabase/supabase-js": "^2.104.1",
+    "@tailwindcss/typography": "^0.5.19",
+    "gray-matter": "^4.0.3",
     "next": "15.2.8",
+    "next-mdx-remote": "^6.0.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-icons": "^5.5.0",
+    "rehype-pretty-code": "^0.14.3",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^4.0.2",
     "stripe": "^17.3.1",
     "svix": "^1.92.2"
   },

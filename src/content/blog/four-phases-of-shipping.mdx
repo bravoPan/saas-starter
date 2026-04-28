@@ -1,0 +1,79 @@
+---
+title: The four phases of shipping a feature
+description: A framework that doesn't bullshit — and where most teams skip a phase.
+date: 2026-04-25
+readTime: 6 min read
+tier: pro
+---
+
+Every feature you ship goes through four phases. Most teams compress them into
+one chaotic blob and wonder why deadlines slip. The four phases are
+**clarify, sketch, build, tighten** — each has a different goal and a different
+failure mode. Skipping any one of them is the single most common reason features
+ship late or wrong.
+
+## Phase 1 · Clarify
+
+Spend the first day asking what problem you&apos;re actually solving. Don&apos;t
+write code. Don&apos;t draw mocks. Just write the smallest description of the
+user pain that would tell you the feature shipped.
+
+The output of this phase is **one sentence**. If you can&apos;t fit it in one
+sentence, you don&apos;t understand it yet.
+
+> "When a free user clicks Subscribe, they land in Stripe Checkout within 2
+> seconds and their subscription is reflected in our DB before they see the
+> success page."
+
+That&apos;s the brief. Everything else flows from this.
+
+## Phase 2 · Sketch
+
+Draw the simplest version that could plausibly work. Skeleton routes, fake
+data, empty UI states. **Resist the urge to optimize before you can see the
+full path.**
+
+Your goal here is to find the seams — where data crosses systems, where auth
+gets checked, where mistakes will happen. You&apos;re not building yet. You&apos;re
+mapping risk.
+
+```typescript
+// Sketch phase output looks like this:
+async function POST(req: Request) {
+  const userId = await requireAuth(req);
+  const customer = await stripe.customers.retrieve(userId); // TODO: cache
+  const session = await stripe.checkout.sessions.create({ /* TODO */ });
+  return NextResponse.json({ url: session.url });
+}
+```
+
+It&apos;s ugly. It&apos;s incomplete. That&apos;s the point.
+
+## Phase 3 · Build
+
+Now you build for real. The trick: do it in the order revealed by Phase 2.
+Highest-risk seams first.
+
+Most teams build inside-out (perfecting the unit they understand best),
+then slam everything together at the end and discover the seams don&apos;t fit.
+**Build outside-in.** Start with the request boundary and work inward.
+
+## Phase 4 · Tighten
+
+Now — and only now — do you optimize. Cache, refactor, error-message polish,
+empty-state copy, edge cases nobody hits. **Phase 4 is what separates "it works"
+from "it ships".**
+
+The discipline is to not start tightening until the build is end-to-end. If you
+tighten too early, you tighten code that&apos;s about to be deleted.
+
+## What goes wrong
+
+| Phase skipped | Symptom |
+| --- | --- |
+| Clarify | Feature ships, no one uses it |
+| Sketch | Last-mile integration disasters at week 3 |
+| Build | Spaghetti from "just one more change" |
+| Tighten | Ships, but flaky, and Slack lights up |
+
+Pick one feature you shipped recently. Which phase did you compress?

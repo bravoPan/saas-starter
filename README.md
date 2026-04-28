@@ -11,7 +11,7 @@ A production-ready Next.js 15 starter with **Clerk** (auth), **Stripe** (subscri
 - **Account page** — `/account` shows current plan, status, renewal date, and a "Manage subscription" button that opens the Stripe Customer Portal.
 - **Webhooks** — `/api/webhooks/stripe` and `/api/webhooks/clerk` with Svix / Stripe signature verification.
 - **Health check** — `/api/health/supabase` returns row counts so uptime monitors can verify DB connectivity.
-- **Blog scaffold** — minimal in-file post store at `src/app/blog/posts.ts`. Swap for MDX or Supabase when you outgrow it.
+- **MDX blog** — drop `.mdx` files into `src/content/blog/`. Frontmatter-driven. `tier:` in frontmatter auto-paywalls the post. Syntax-highlighted via `rehype-pretty-code`.
 - **CI** — GitHub Actions workflow that runs `next build` on every PR (catches the prod-only TypeScript errors that `next dev` silently skips).
 
 ## Stack
@@ -149,21 +149,49 @@ export const TIER_LEVEL: Record<Tier, number> = {
 
 Then add the `tier` value to your Stripe Product's `metadata.tier` field — `syncSubscriptionFromStripe` reads it on every webhook.
 
-### Replace the in-file blog with MDX
+### Write a blog post
 
-```bash
-npm install @next/mdx @mdx-js/react @mdx-js/loader
+Drop a new `.mdx` file in `src/content/blog/`. Filename = slug. Frontmatter:
+
+```yaml
+---
+title: My new post
+description: Shows up in <meta description> and the index card.
+date: 2026-04-28
+readTime: 5 min read       # optional, free-form text
+tier: free                 # optional. Omit for public. Set 'basic'|'pro'|'enterprise' to gate.
+---
+
+Body here. **Markdown** + tables + ~~strike~~ (via remark-gfm)
+work out of the box. Code blocks have syntax highlighting:
+
+```typescript
+console.log("hello");
+```
 ```
 
-1. Drop `.mdx` files in `src/content/blog/`.
-2. Wire `next.config.ts` with `withMDX`.
-3. Replace `getAllPosts()` / `getPost()` in `src/app/blog/posts.ts` with filesystem reads.
+Then visit `/blog` — your post appears, sorted by date, with a tier badge if gated.
 
-### Replace the in-file blog with Supabase CMS
+**How tier-gating works.** When `tier` is set to anything but `free`, the renderer
+splits the MDX at the first blank line: paragraph 1 becomes the public preview,
+the rest is wrapped in `<Paywall>`. To pick a custom split point, drop
+`<!-- preview-end -->` anywhere in the body — everything before it becomes the
+preview.
 
-1. Add a `posts` table (`slug, title, body_mdx, published_at, tier`) to Supabase.
-2. Replace `getAllPosts()` with a Supabase query.
-3. Wrap each post body in `<Gate tier={post.tier}>` to enforce paid content.
+**Customizing rendering.** Override MDX elements (e.g. add custom `<Callout>`
+components, style headings) in `src/app/blog/mdx-components.tsx` — that's the
+`components` prop passed to `<MDXRemote>`.
+
+### Replace file-based MDX with a Supabase CMS
+
+The blog is structured so you can swap the source without touching the page
+components. Two places to change:
+
+1. Add a `posts` table to Supabase: `slug text primary key, title text, description text, body_mdx text, published_at timestamptz, tier tier_enum`.
+2. Replace the implementations of `getAllPosts()` and `getPost()` in `src/app/blog/posts.ts` with Supabase queries that return the same `BlogPost` shape (`{ slug, title, description, date, readTime?, tier?, mdx }`).
+
+The pages (`/blog`, `/blog/[slug]`), the paywall logic, the MDX components
+config — none of them need to change. They consume `BlogPost`, not files.
 
 ### Protect a whole page
 
