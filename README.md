@@ -151,36 +151,9 @@ Then add the `tier` value to your Stripe Product's `metadata.tier` field — `sy
 
 ### Write a blog post
 
-Drop a new `.mdx` file in `src/content/blog/`. Filename = slug. Frontmatter:
+Run the app and open [`/blog/writing-guide`](http://localhost:3000/blog/writing-guide) — it's a self-documenting MDX post that covers everything: frontmatter fields, syntax highlighting, tables, tier-gating with the `<!-- preview-end -->` delimiter, internal vs external link handling, custom components, common gotchas, and the migration path to a CMS.
 
-```yaml
----
-title: My new post
-description: Shows up in <meta description> and the index card.
-date: 2026-04-28
-readTime: 5 min read       # optional, free-form text
-tier: free                 # optional. Omit for public. Set 'basic'|'pro'|'enterprise' to gate.
----
-
-Body here. **Markdown** + tables + ~~strike~~ (via remark-gfm)
-work out of the box. Code blocks have syntax highlighting:
-
-```typescript
-console.log("hello");
-```
-```
-
-Then visit `/blog` — your post appears, sorted by date, with a tier badge if gated.
-
-**How tier-gating works.** When `tier` is set to anything but `free`, the renderer
-splits the MDX at the first blank line: paragraph 1 becomes the public preview,
-the rest is wrapped in `<Paywall>`. To pick a custom split point, drop
-`<!-- preview-end -->` anywhere in the body — everything before it becomes the
-preview.
-
-**Customizing rendering.** Override MDX elements (e.g. add custom `<Callout>`
-components, style headings) in `src/app/blog/mdx-components.tsx` — that's the
-`components` prop passed to `<MDXRemote>`.
+The 30-second version: drop `.mdx` into `src/content/blog/`, add three required frontmatter fields (`title`, `description`, `date`), and you're done. Add `tier: pro` to auto-paywall the body.
 
 ### Replace file-based MDX with a Supabase CMS
 

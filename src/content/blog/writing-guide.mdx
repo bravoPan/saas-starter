@@ -1,0 +1,303 @@
+---
+title: Writing posts — the MDX guide
+description: Everything you can put in a blog post, and how the frontmatter wires into tier-gating.
+date: 2026-04-28
+readTime: 8 min read
+---
+
+This page **is** an MDX post. View its source at
+[`src/content/blog/writing-guide.mdx`](https://github.com/bravoPan/saas-starter/blob/main/src/content/blog/writing-guide.mdx)
+to see exactly what produced what you're reading.
+
+## The 30-second version
+
+1. Drop a file at `src/content/blog/<your-slug>.mdx`.
+2. Add frontmatter (3 required fields).
+3. Save. It shows up at `/blog/<your-slug>`.
+
+That's it. No build step, no registration, no config.
+
+```bash
+# Smallest possible post:
+cat > src/content/blog/hello-world.mdx <<'EOF'
+---
+title: Hello world
+description: My first post.
+date: 2026-04-28
+---
+
+Body goes here.
+EOF
+```
+
+---
+
+## Frontmatter reference
+
+Every field in detail:
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `title` | string | yes | Shown as `<h1>` and in `<title>` tag. |
+| `description` | string | yes | Used in `<meta description>` and the index card. Keep under ~160 chars. |
+| `date` | date | yes | Any Date-parseable string (`2026-04-28` works). Posts sort newest-first by this. |
+| `readTime` | string | no | Free-form (`5 min read`, `Quick`, anything). Shown next to the date. |
+| `tier` | enum | no | One of `free` / `basic` / `pro` / `enterprise`. Omit (or set to `free`) for fully public. Anything else triggers the paywall. |
+
+**Validation runs at parse time.** If a required field is missing, or `tier` is
+not one of the valid values, the build fails loudly with the filename. You won't
+ship a broken post.
+
+---
+
+## Markdown — what's supported
+
+All standard markdown plus [GitHub-Flavored Markdown](https://github.github.com/gfm/)
+via `remark-gfm`.
+
+### Inline
+
+You can use **bold**, *italic*, ~~strikethrough~~, `inline code`, and
+[links to anything](https://example.com).
+
+### Lists
+
+Unordered:
+
+- One
+- Two
+  - Nested
+  - Also nested
+- Three
+
+Ordered:
+
+1. First
+2. Second
+3. Third
+
+Task lists (GFM):
+
+- [x] Write a guide
+- [x] Show task lists work
+- [ ] Convince someone to read it
+
+### Blockquotes
+
+> Blockquotes work and pick up the prose styling. Use them for callouts that
+> are quotes; use a real callout component for things that aren't.
+
+### Tables
+
+| Column | What it does | Example |
+| --- | --- | --- |
+| `title` | Heading | "How to ship faster" |
+| `tier` | Gates the body | `pro` |
+
+---
+
+## Code blocks
+
+Triple-backtick fenced code blocks with a language tag get **server-side syntax
+highlighting** via `rehype-pretty-code` + `shiki`. Zero client JS.
+
+```typescript
+// TypeScript
+function meetsTier(user: Tier | null, required: Tier): boolean {
+  if (user === null) return false;
+  return TIER_LEVEL[user] >= TIER_LEVEL[required];
+}
+```
+
+```bash
+# Shell
+npm install
+npm run dev
+```
+
+```sql
+-- SQL
+select id, status, tier from subscriptions where user_id = $1;
+```
+
+```json
+{
+  "stack": ["next", "clerk", "stripe", "supabase"],
+  "lines_of_glue_code_you_save": "a lot"
+}
+```
+
+The theme is `github-dark-dimmed`. To change it, edit `MDX_OPTIONS` in
+`src/app/blog/[slug]/page.tsx` — Shiki ships dozens of themes.
+
+---
+
+## Links — internal vs external
+
+The MDX renderer is smart about links. You don't need to write them differently:
+
+- Links starting with `/` or `#` → automatically use `next/link` (client-side nav, no full reload).
+- Everything else → opens in a new tab with `rel="noopener noreferrer"`.
+
+So `[the pricing page](/pricing)` and `[Next.js](https://nextjs.org)` both Just Work.
+
+The logic lives in `src/app/blog/mdx-components.tsx`. That's also where you'd
+add custom components (e.g. a `<Callout>` or `<YouTube>` embed) that you can
+then use directly in MDX.
+
+---
+
+## Tier-gating — the killer feature
+
+Set `tier:` in your frontmatter to anything other than `free` and the post
+becomes **soft-paywalled**:
+
+- The first paragraph stays public — it becomes the SEO-visible preview that
+  free readers see.
+- Everything else gets wrapped in `<Paywall>`, which shows an "Upgrade to X" CTA.
+- Subscribers at the required tier or higher see the full post.
+
+```yaml
+---
+title: My members-only deep-dive
+description: A subtitle that's safe for everyone to see.
+date: 2026-04-28
+tier: pro          # <-- this triggers the paywall
+---
+
+This first paragraph is the public preview. Make it good — it's what
+shows up to free readers and search engines.
+
+The rest of the post is locked. Upgrade prompts appear here automatically.
+```
+
+### Custom preview boundary
+
+Want more (or less) than one paragraph in the preview? Drop the magic comment
+**`\<!-- preview-end -->`** anywhere in your MDX (the leading `\` is just to
+escape this prose; in your file write it without the backslash). Everything
+before it is the public preview; everything after is the paid body.
+
+```mdx
+---
+title: A long intro that should all be public
+tier: pro
+---
+
+First public paragraph.
+
+Second public paragraph that's also part of the hook.
+
+A third one with some context.
+
+<!-- preview-end -->
+
+Locked content starts here. Bring out the good stuff.
+```
+
+### See it live
+
+Visit [`/blog/four-phases-of-shipping`](/blog/four-phases-of-shipping). It has
+`tier: pro` in its frontmatter — if you're not subscribed at Pro+ you'll see
+the preview + upgrade CTA; if you are, you see the whole post.
+
+For the deep dive on every gating pattern (page-level, section-level, soft
+paywall, silent gate), see [`/premium`](/premium).
+
+---
+
+## Adding custom components
+
+The renderer accepts a `components` map (see `src/app/blog/mdx-components.tsx`).
+Define a component, register it in the map, then use it directly in any MDX file.
+
+Example — adding a callout:
+
+```tsx
+// src/app/blog/mdx-components.tsx
+export const MDX_COMPONENTS = {
+  // ... existing overrides
+  Callout: ({ children }: { children: React.ReactNode }) => (
+    <div className="my-6 p-4 rounded-lg border-l-4 border-primary bg-primary-50">
+      {children}
+    </div>
+  ),
+};
+```
+
+Then in any post:
+
+```mdx
+<Callout>
+  Heads up: this only works in production.
+</Callout>
+```
+
+Components are server components by default. Need interactivity? Mark the
+component file with `"use client"` like anywhere else in Next.
+
+---
+
+## Common gotchas
+
+**MDX is JSX-flavored markdown.** Curly braces (`{`, `}`) are interpreted as
+JSX expressions. If you need a literal brace in prose, escape it: `\{`.
+
+**Indented code blocks don't get highlighting.** Always use fenced code blocks
+with backticks. The 4-space-indent style works for plain `<pre>` but bypasses
+`rehype-pretty-code`.
+
+**The `date` field affects sort order.** Posts are sorted newest-first by
+`date`. If you backdate a post it'll show up further down the index.
+
+**Filename = slug.** Rename the file → URL changes → links break. If you
+need to rename, do it before sharing the link.
+
+**Frontmatter parse errors stop the build.** That's intentional. A typo in
+`tier:` should never silently ship a publicly-readable "paid" post.
+
+---
+
+## When to outgrow this
+
+File-based MDX is great for solo or small-team blogs (~< 100 posts). You'll
+want to migrate when:
+
+- Multiple authors need to publish without git access (you need a CMS UI)
+- Posts need scheduled publishing (you need a `published_at` column + a query filter)
+- You want analytics / drafts / revisions / an editor with preview
+
+The migration path is pre-built. Replace the implementations of `getAllPosts()`
+and `getPost()` in `src/app/blog/posts.ts` with Supabase queries that return
+the same `BlogPost` shape (`{ slug, title, description, date, readTime?, tier?, mdx }`).
+The pages, paywall logic, and MDX components don't change — they consume the
+type, not the storage. README has the table schema.
+
+---
+
+## TL;DR cheatsheet
+
+**Required frontmatter:**
+
+```yaml
+title: string
+description: string
+date: 2026-04-28
+```
+
+**Optional frontmatter:**
+
+```yaml
+readTime: 5 min read
+tier: free | basic | pro | enterprise
+```
+
+**Body can include:**
+
+- Standard markdown — `**bold**`, `*italic*`, `[link](url)`, lists, blockquotes
+- GFM — tables, `~~strike~~`, task lists
+- Fenced code blocks (with language tag) → server-side syntax highlighting
+- Magic delimiter `\<!-- preview-end -->` → custom paywall split point
+- `<CustomComponent />` — anything registered in `mdx-components.tsx`
+
+That's it. Go write something.

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { FiBookOpen, FiArrowRight } from 'react-icons/fi';
 import NavBar from '@/app/components/navigation/NavBar';
 import Footer from '@/app/components/Footer';
 import { getAllPosts } from './posts';
@@ -8,6 +9,8 @@ export const metadata = {
   title: 'Blog',
 };
 
+const WRITING_GUIDE_SLUG = 'writing-guide';
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -15,13 +18,16 @@ function formatDate(iso: string): string {
 }
 
 export default function BlogIndexPage() {
-  const posts = getAllPosts();
+  const allPosts = getAllPosts();
+  const hasGuide = allPosts.some((p) => p.slug === WRITING_GUIDE_SLUG);
+  // Surface the writing guide separately as a CTA card, not in the post list.
+  const posts = allPosts.filter((p) => p.slug !== WRITING_GUIDE_SLUG);
 
   return (
     <main className="min-h-screen">
       <NavBar />
       <div className="container py-16">
-        <header className="mb-12 max-w-2xl">
+        <header className="mb-10 max-w-2xl">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Blog</h1>
           <p className="text-lg text-gray-600">
             MDX-powered. Drop <code className="px-1.5 py-0.5 bg-gray-100 rounded text-sm">.mdx</code>{' '}
@@ -29,6 +35,32 @@ export default function BlogIndexPage() {
             and they appear here.
           </p>
         </header>
+
+        {hasGuide && (
+          <Link
+            href={`/blog/${WRITING_GUIDE_SLUG}`}
+            className="group flex items-start gap-4 p-5 mb-10 rounded-xl border border-primary-100 bg-primary-50/60 hover:bg-primary-50 hover:border-primary-200 transition"
+          >
+            <div className="shrink-0 w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center">
+              <FiBookOpen className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-primary-700">
+                  New here?
+                </span>
+              </div>
+              <h2 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                Writing posts — the MDX guide
+              </h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Frontmatter fields, code highlighting, tier-gating, custom components, and the
+                migration path to a Supabase CMS.
+              </p>
+            </div>
+            <FiArrowRight className="self-center shrink-0 text-primary opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition" />
+          </Link>
+        )}
 
         {posts.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-12 text-center">
